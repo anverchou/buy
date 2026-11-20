@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block title %}Settings · Price-Tracked Shopping List{% endblock %}
+{% block content %}
+<div class="page-head"><h1>Settings</h1></div>
+
+<section class="card">
+  <h2>What counts as “lowest”</h2>
+  <form method="post" action="{{ url_for('main.settings_save') }}" class="stack">
+    <input type="hidden" name="csrf" value="{{ csrf_token }}">
+    <label class="check"><input type="checkbox" name="costco_member" value="1" {% if prefs.costco_member %}checked{% endif %}>
+      <span>I have a Costco membership <span class="muted">— otherwise Costco prices are shown but not counted</span></span></label>
+    <label class="check"><input type="checkbox" name="include_nonnew" value="1" {% if prefs.include_nonnew %}checked{% endif %}>
+      <span>Count renewed and used offers <span class="muted">— off by default so a refurbished unit never looks like the deal</span></span></label>
+    <div><button class="btn btn-primary btn-small">Save</button></div>
+  </form>
+</section>
+
+<section class="card">
+  <h2>Data sources</h2>
+  <p>Mode: <strong>{{ 'Demo data' if mode == 'mock' else 'Live' }}</strong>
+    <span class="muted">(DATA_MODE={{ cfg.DATA_MODE }})</span></p>
+  <table class="plain">
+    <thead><tr><th scope="col">Source</th><th scope="col">Status</th><th scope="col">Details</th></tr></thead>
+    <tbody>
+    {% for s in statuses %}
+      <tr><td>{{ s.label }}</td>
+        <td>{% if s.configured %}<span class="stock-in">● Ready</span>{% else %}<span class="muted">○ Not configured</span>{% endif %}</td>
+        <td class="muted">{{ s.detail }}</td></tr>
+    {% endfor %}
+    {% set names = statuses|map(attribute='name')|list %}
+    {% if 'serpapi' not in names %}
+      <tr><td>Google Shopping (SerpApi)</td><td><span class="muted">○ Add SERPAPI_API_KEY</span></td><td class="muted">Current prices across retailers</td></tr>
+    {% endif %}
+    {% if 'keepa' not in names %}
+      <tr><td>Keepa (Amazon history)</td><td><span class="muted">○ Add KEEPA_API_KEY</span></td><td class="muted">Full Amazon price history</td></tr>
+    {% endif %}
+    </tbody>
+  </table>
+  {% if cfg.NTFY_TOPIC %}<p class="small">Price-drop push alerts go to ntfy topic <code>{{ cfg.NTFY_TOPIC }}</code>.</p>
+  {% else %}<p class="small muted">Push alerts are off. Set NTFY_TOPIC to get a phone notification when an item drops below its target.</p>{% endif %}
+</section>
+
+<section class="card">
+  <h2>Daily price snapshot</h2>
+  <p class="small muted">Records one price per listing per day for everything on your list. Schedule <code>flask --app app snapshot</code> (see README); you can also run it here.</p>
+  <form method="post" action="{{ url_for('main.settings_run_snapshot') }}" class="inline">
+    <input type="hidden" name="csrf" value="{{ csrf_token }}">
+    <button class="btn btn-small">Run snapshot now</button>
+  </form>
+  <form method="post" action="{{ url_for('main.settings_run_snapshot') }}" class="inline">
+    <input type="hidden" name="csrf" value="{{ csrf_token }}"><input type="hidden" name="force" value="1">
+    <button class="btn btn-small btn-ghost" title="Re-check items already checked today (uses API credits)">Force re-check</button>
+  </form>
+  {% if runs %}
+  <table class="plain">
+    <thead><tr><th scope="col">Started</th><th scope="col" class="num">Checked</th><th scope="col" class="num">Skipped</th><th scope="col" class="num">Prices</th><th scope="col" class="num">Errors</th></tr></thead>
+    <tbody>
+    {% for r in runs %}
+      <tr><td>{{ r.started_at|local_dt }}</td><td class="num">{{ r.products_checked }}</td><td class="num">{{ r.products_skipped }}</td>
+        <td class="num">{{ r.points_written }}</td><td class="num">{{ r.errors }}</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% if runs[0].log %}<details class="disclose"><summary class="btn btn-small btn-ghost">Last run log</summary><pre class="log">{{ runs[0].log }}</pre></details>{% endif %}
+  {% endif %}
+</section>
+
+<section class="card">
+  <h2>Demo data</h2>
+  {% if demo_count %}
+  <p class="small">{{ demo_count }} demo products are loaded. Removing them deletes their list items and history.</p>
+  <form method="post" action="{{ url_for('main.settings_remove_demo') }}" class="inline">
+    <input type="hidden" name="csrf" value="{{ csrf_token }}"><button class="btn btn-small btn-ghost">Remove demo data</button>
+  </form>
+  {% else %}
+  <p class="small muted">No demo products loaded.</p>
+  <form method="post" action="{{ url_for('main.settings_load_demo') }}" class="inline">
+    <input type="hidden" name="csrf" value="{{ csrf_token }}"><button class="btn btn-small">Load demo list</button>
+  </form>
+  {% endif %}
+</section>
+{% endblock %}

@@ -1,0 +1,178 @@
+{% extends "base.html" %}
+{% from "_macros.html" import signal_chip, product_title, product_meta, item_fields, priority_pill %}
+{% block title %}{{ product.name }}{% if product.variant %} ({{ product.variant }}){% endif %} · Price-Tracked Shopping List{% endblock %}
+{% block content %}
+<section class="product-head card">
+  <div class="thumb thumb-lg">{% if product.image_url %}<img src="{{ product.image_url }}" alt="">{% endif %}</div>
+  <div class="product-info">
+    <h1>{{ product_title(product, link=false) }}</h1>
+    <p class="muted">{{ product_meta(product) }}</p>
+    {% if best %}
+    <p class="best-line"><span class="price-big">{{ best.total|money }}</span>
+      best total at {{ best.retailer_label }}{% if best.shipping %} (incl. {{ best.shipping|money }} shipping){% endif %}</p>
+    {% endif %}
+  </div>
+  <div class="product-list-form">
+    {% if item %}
+      <p class="on-list">✓ On your list · Qty {{ item.quantity }} · {{ priority_pill(item.priority) }}
+        {% if item.target_price is not none %}· Target {{ item.target_price|money }}{% endif %}</p>
+      <details class="disclose">
+        <summary class="btn btn-small">Edit list item</summary>
+        <form method="post" action="{{ url_for('main.list_update', iid=item.id) }}" class="stack">
+          <input type="hidden" name="csrf" value="{{ csrf_token }}">
+          <input type="hidden" name="next" value="{{ url_for('main.product_page', pid=product.id) }}">
+          {{ item_fields(item) }}
+          <button class="btn btn-primary btn-small">Save</button>
+        </form>
+      </details>
+    {% else %}
+      <details class="disclose" open>
+        <summary class="btn btn-primary">+ Add to list</summary>
+        <form method="post" action="{{ url_for('main.list_add') }}" class="stack">
+          <input type="hidden" name="csrf" value="{{ csrf_token }}">
+          <input type="hidden" name="product_id" value="{{ product.id }}">
+          {{ item_fields(none) }}
+          <button class="btn btn-primary btn-small">Add to list</button>
+        </form>
+      </details>
+    {% endif %}
+  </div>
+</section>
+
+<section class="card" id="compare" aria-labelledby="compare-h">
+  <div class="section-head">
+    <h2 id="compare-h">Prices now</h2>
+    <div class="tools">
+      <label class="sort">Sort
+        <select id="offer-sort">
+          <option value="total">Total cost</option>
+          <option value="price">Price</option>
+          <option value="retailer">Retailer</option>
+        </select>
+      </label>
+      <form method="post" action="{{ url_for('main.product_refresh', pid=product.id) }}" class="inline">
+        <input type="hidden" name="csrf" value="{{ csrf_token }}">
+        <button class="btn btn-small" title="Fetch current prices now">↻ Refresh</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="table-scroll">
+  <table class="offers" id="offers">
+    <thead>
+      <tr><th scope="col">Retailer</th><th scope="col" class="num">Price</th><th scope="col" class="num">Shipping</th>
+        <th scope="col" class="num">Total</th><th scope="col">Stock</th><th scope="col">Condition</th>
+        <th scope="col">Membership</th><th scope="col">Last checked</th><th scope="col"><span class="sr-only">Link</span></th></tr>
+    </thead>
+    <tbody>
+    {% for r in rows %}
+      {% set group = 3 if r.placeholder else (2 if r.price is none else (1 if not r.in_stock else 0)) %}
+      <tr class="{% if r.is_best %}is-best{% endif %}{% if r.placeholder %} is-placeholder{% endif %}{% if not r.eligible and not r.placeholder %} is-muted{% endif %}"
+          data-group="{{ group }}" data-total="{{ r.total if r.total is not none else '' }}"
+          data-price="{{ r.price if r.price is not none else '' }}" data-retailer="{{ r.retailer_label }}">
+        <th scope="row" data-label="Retailer">
+          <span class="key" style="--key: var(--series-{{ retailers[r.retailer].slot }})" aria-hidden="true"></span>
+          <span class="retailer">{{ r.retailer_label }}</span>
+          {% if r.is_best %}<span class="chip chip-best"><span class="chip-icon" aria-hidden="true">★</span>Lowest total</span>{% endif %}
+          {% if r.seller %}<span class="seller">Sold by {{ r.seller }}</span>{% endif %}
+          {% if r.note and not r.placeholder and not r.is_best %}<span class="row-note">{{ r.note }}</span>{% endif %}
+        </th>
+        {% if r.placeholder %}
+          <td colspan="7" class="placeholder-cell" data-label="">
+            <span class="muted">{{ r.note }}</span>
+            <button type="button" class="linkbtn" data-log-retailer="{{ r.retailer }}">Log a price</button>
+          </td>
+          <td data-label="" class="link-cell">{% if r.url %}<a href="{{ r.url }}" target="_blank" rel="noopener noreferrer" class="extlink">Search ↗</a>{% endif %}</td>
+        {% else %}
+          <td class="num" data-label="Price">{{ r.price|money }}</td>
+          <td class="num" data-label="Shipping">{{ r.shipping|shipping if r.price is not none else '—' }}</td>
+          <td class="num total" data-label="Total"><strong>{{ r.total|money }}</strong></td>
+          <td data-label="Stock">{% if r.in_stock %}<span class="stock-in">● In stock</span>{% else %}<span class="stock-out">○ Out of stock</span>{% endif %}</td>
+          <td data-label="Condition" class="{{ 'cond-new' if r.condition == 'new' }}">{{ r.condition_label }}</td>
+          <td data-label="Membership" class="{{ 'member-none' if not r.requires_membership }}">{% if r.requires_membership %}<span class="pill pill-member">Members only</span>{% else %}<span class="muted">Not required</span>{% endif %}</td>
+          <td data-label="Last checked"><time datetime="{{ r.last_checked.isoformat() if r.last_checked else '' }}" title="{{ r.last_checked|local_dt }}">{{ r.last_checked_label }}</time>
+            {% if r.source == 'manual' %}<span class="muted small">· logged by you</span>{% endif %}
+            {% if r.stale %}<span class="warn small">· stale</span>{% endif %}</td>
+          <td data-label="" class="link-cell">{% if r.url %}<a href="{{ r.url }}" target="_blank" rel="noopener noreferrer" class="extlink">View ↗</a>{% endif %}</td>
+        {% endif %}
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  <p class="fineprint">Total = price + shipping, before tax.
+    {% if not prefs.include_nonnew %}Renewed and used offers are listed but not counted for “lowest.”{% endif %}
+    {% if not prefs.costco_member %}Costco is excluded from “lowest” (no membership — change in Settings).{% endif %}
+  </p>
+
+  <details class="disclose log-price" id="log-price">
+    <summary class="btn btn-small">Log a price you saw</summary>
+    <form method="post" action="{{ url_for('main.product_log_price', pid=product.id) }}" class="stack">
+      <input type="hidden" name="csrf" value="{{ csrf_token }}">
+      <p class="muted small">For stores with no price feed (often Costco or the manufacturer). Saved as today's price and added to the history.</p>
+      <div class="fields">
+        <label>Retailer
+          <select name="retailer" id="log-retailer">
+            {% for key, label in retailer_choices %}<option value="{{ key }}">{{ label }}</option>{% endfor %}
+          </select>
+        </label>
+        <label>Price <span class="input-money"><input type="text" name="price" inputmode="decimal" required></span></label>
+        <label>Shipping <span class="input-money"><input type="text" name="shipping" inputmode="decimal" placeholder="0"></span></label>
+        <label>Condition
+          <select name="condition">{% for k, l in condition_labels.items() %}<option value="{{ k }}">{{ l }}</option>{% endfor %}</select>
+        </label>
+        <label>Stock
+          <select name="in_stock"><option value="1">In stock</option><option value="0">Out of stock</option></select>
+        </label>
+        <label>Date <input type="date" name="day" value="{{ today.isoformat() }}" max="{{ today.isoformat() }}"></label>
+        <label class="wide">Link (optional) <input type="url" name="url" placeholder="https://"></label>
+      </div>
+      <button class="btn btn-primary btn-small">Save price</button>
+    </form>
+  </details>
+</section>
+
+<section class="card" id="history" aria-labelledby="history-h">
+  <div class="section-head">
+    <h2 id="history-h">Price history</h2>
+    <div class="segmented" role="group" aria-label="Time window">
+      {% for key, label, _d, _a in windows %}
+      <button type="button" data-window="{{ key }}" aria-pressed="{{ 'true' if key == history.default else 'false' }}">{{ label }}</button>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="signal" id="signal" aria-live="polite">
+    {{ signal_chip(history.windows[history.default].signal) }}
+    <span class="signal-detail">{{ history.windows[history.default].signal.detail }}</span>
+  </div>
+
+  <div class="legend" id="chart-legend" role="group" aria-label="Show or hide retailers"></div>
+  <div class="chart-wrap">
+    <canvas id="history-chart" role="img" aria-label="Price history by retailer; values are in the table below"></canvas>
+    <div class="chart-tip" id="chart-tip" hidden></div>
+  </div>
+  <p class="coverage muted small" id="coverage"></p>
+
+  <div class="table-scroll">
+    <table class="stats" id="stats-table">
+      <thead><tr><th scope="col">Retailer</th><th scope="col" class="num">Current</th><th scope="col" class="num">Low</th>
+        <th scope="col" class="num">High</th><th scope="col" class="num">Average</th><th scope="col" class="num">Above low</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+  <p class="fineprint">Item price before shipping. “Best available” is the lowest in-stock price each day among the offers counted for “lowest.”
+    The buy signal compares today's best price with that line: within 2% of the window's low is “at low,” more than 3% under the average is “below average.”</p>
+
+  <details class="disclose">
+    <summary class="btn btn-small">Daily prices table</summary>
+    <div class="table-scroll daily-wrap"><table class="daily" id="daily-table"></table></div>
+  </details>
+</section>
+
+<script id="history-data" type="application/json">{{ history|tojson }}</script>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='vendor/chart.umd.min.js') }}"></script>
+<script src="{{ url_for('static', filename='js/product.js') }}"></script>
+{% endblock %}

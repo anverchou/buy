@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}{% if q %}{{ q }} · {% endif %}Search · Price-Tracked Shopping List{% endblock %}
+{% block content %}
+<div class="page-head"><h1>Find a product</h1></div>
+
+<form class="bigsearch" action="{{ url_for('main.search_page') }}" method="get" role="search">
+  <input type="search" name="q" value="{{ q }}" autofocus
+         placeholder="Product name, model number, UPC, or a pasted product link" aria-label="Search">
+  <button class="btn btn-primary">Search</button>
+</form>
+{% if data_mode == 'mock' %}
+<p class="hint">Try the demo catalog: <a href="?q=air+fryer">air fryer</a> · <a href="?q=KSM150PSER">KSM150PSER</a> ·
+  <a href="?q=200003000056">200003000056</a> (UPC) · <a href="?q=B0DEMO0161">B0DEMO0161</a> (ASIN) ·
+  <a href="?q=https%3A%2F%2Fwww.walmart.com%2Fip%2FNinja-Air-Fryer-Max-XL-AF161%2F123456789">a pasted Walmart link</a></p>
+{% else %}
+<p class="hint">Works with a product name, a model number, a 12–13 digit UPC/EAN, an Amazon ASIN, or a product link from Amazon, Walmart, Target, Best Buy, Home Depot or Costco.</p>
+{% endif %}
+
+{% if outcome %}
+  {% for n in outcome.notes %}<div class="flash flash-info">{{ n }}</div>{% endfor %}
+  {% for e in outcome.errors %}<div class="flash flash-error">{{ e }}</div>{% endfor %}
+
+  {% if outcome.results %}
+  <p class="result-count">{{ outcome.results|length }} result{{ 's' if outcome.results|length != 1 }} · pick the exact size, color or variant</p>
+  <ul class="results">
+    {% for r in outcome.results %}
+    <li class="result card">
+      <div class="thumb">{% if r.image_url %}<img src="{{ r.image_url }}" alt="" loading="lazy">{% endif %}</div>
+      <div class="result-main">
+        <h2 class="result-title">{{ r.name }}</h2>
+        <dl class="specs">
+          {% if r.brand %}<div><dt>Brand</dt><dd>{{ r.brand }}</dd></div>{% endif %}
+          {% if r.model %}<div><dt>Model</dt><dd>{{ r.model }}</dd></div>{% endif %}
+          <div><dt>Size / variant</dt><dd>{{ r.variant or 'Not listed' }}</dd></div>
+          {% if r.upc %}<div><dt>UPC</dt><dd>{{ r.upc }}</dd></div>{% endif %}
+        </dl>
+        {% if r.price_hint %}<p class="muted small">From {{ r.price_hint|money }}{% if r.store_hint %} at {{ r.store_hint }}{% endif %}</p>{% endif %}
+      </div>
+      <div class="result-action">
+        {% if outcome.existing.get(loop.index0) %}
+          <a class="btn" href="{{ url_for('main.product_page', pid=outcome.existing[loop.index0]) }}">View prices</a>
+        {% else %}
+          <form method="post" action="{{ url_for('main.select_product') }}">
+            <input type="hidden" name="csrf" value="{{ csrf_token }}">
+            <input type="hidden" name="payload" value="{{ payloads[loop.index0] }}">
+            <button class="btn btn-primary">Compare prices</button>
+          </form>
+        {% endif %}
+      </div>
+    </li>
+    {% endfor %}
+  </ul>
+  {% elif not outcome.errors and not outcome.notes %}
+  <div class="empty card"><h2>No matches</h2><p>Try fewer words, the model number, or the UPC from the box.</p></div>
+  {% endif %}
+{% endif %}
+{% endblock %}

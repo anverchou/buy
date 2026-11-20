@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% from "_macros.html" import product_title %}
+{% block title %}Past purchases · Price-Tracked Shopping List{% endblock %}
+{% block content %}
+<div class="page-head"><h1>Past purchases</h1></div>
+{% if items %}
+<section class="summary">
+  <div class="stat"><div class="stat-label">Spent</div><div class="stat-value">{{ spent|money }}</div>
+    <div class="stat-sub">{{ items|length }} purchase{{ 's' if items|length != 1 }}</div></div>
+</section>
+<ul class="items archive">
+  {% for item in items %}
+  <li class="item card">
+    <a class="thumb" href="{{ url_for('main.product_page', pid=item.product.id) }}" tabindex="-1" aria-hidden="true">
+      {% if item.product.image_url %}<img src="{{ item.product.image_url }}" alt="" loading="lazy">{% endif %}</a>
+    <div class="item-main">
+      <h2 class="item-title">{{ product_title(item.product) }}</h2>
+      <div class="item-meta"><span>Bought {{ item.purchased_at|nice_date }}</span>{% if item.paid_retailer %}<span>at {{ item.paid_retailer }}</span>{% endif %}
+        {% if item.quantity > 1 %}<span>Qty {{ item.quantity }}</span>{% endif %}</div>
+      {% if item.notes %}<p class="item-notes">{{ item.notes }}</p>{% endif %}
+    </div>
+    <div class="item-price">
+      <div class="price-big">{{ (item.paid_price * item.quantity)|money if item.paid_price is not none else '—' }}</div>
+      {% if item.quantity > 1 and item.paid_price is not none %}<div class="price-where">{{ item.paid_price|money }} each</div>{% endif %}
+    </div>
+    <div class="item-actions">
+      <form method="post" action="{{ url_for('main.list_restore', iid=item.id) }}" class="inline">
+        <input type="hidden" name="csrf" value="{{ csrf_token }}">
+        <button class="btn btn-small btn-ghost">Move back to list</button>
+      </form>
+    </div>
+  </li>
+  {% endfor %}
+</ul>
+{% else %}
+<div class="empty card"><h2>Nothing checked off yet</h2><p>Items you mark as purchased show up here with what you paid.</p></div>
+{% endif %}
+{% endblock %}

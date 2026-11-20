@@ -1,0 +1,44 @@
+{% macro signal_chip(signal, compact=false) -%}
+  {%- set icons = {'low': '↓', 'below': '↓', 'near': '→', 'above': '↑', 'insufficient': '…', 'none': '–'} -%}
+  <span class="chip chip-{{ signal.kind }}" title="{{ signal.detail }}">
+    <span class="chip-icon" aria-hidden="true">{{ icons.get(signal.kind, '•') }}</span>{{ signal.label }}
+  </span>
+{%- endmacro %}
+
+{% macro target_chip() -%}
+  <span class="chip chip-target"><span class="chip-icon" aria-hidden="true">✓</span>Below target</span>
+{%- endmacro %}
+
+{% macro priority_pill(p) -%}
+  <span class="pill pill-p{{ p }}">{{ {1: 'High', 2: 'Medium', 3: 'Low'}[p] }} priority</span>
+{%- endmacro %}
+
+{% macro product_title(product, link=true) -%}
+  {% if link %}<a href="{{ url_for('main.product_page', pid=product.id) }}">{{ product.name }}</a>{% else %}{{ product.name }}{% endif %}
+  {% if product.variant %}<span class="variant">{{ product.variant }}</span>{% endif %}
+{%- endmacro %}
+
+{% macro product_meta(product) -%}
+  {%- set bits = [] -%}
+  {%- if product.brand %}{% set _ = bits.append(product.brand) %}{% endif -%}
+  {%- if product.model %}{% set _ = bits.append('Model ' ~ product.model) %}{% endif -%}
+  {%- if product.upc %}{% set _ = bits.append('UPC ' ~ product.upc) %}{% endif -%}
+  {{ bits|join(' · ') }}
+{%- endmacro %}
+
+{% macro item_fields(item=none, show_notes=true) -%}
+  <div class="fields">
+    <label>Qty <input type="number" name="quantity" min="1" max="999" value="{{ item.quantity if item else 1 }}" inputmode="numeric"></label>
+    <label>Target price <span class="input-money"><input type="text" name="target_price" inputmode="decimal" placeholder="e.g. 99" value="{{ '%.2f'|format(item.target_price) if item and item.target_price is not none else '' }}"></span></label>
+    <label>Priority
+      <select name="priority">
+        {% for v, l in [(1, 'High'), (2, 'Medium'), (3, 'Low')] %}
+        <option value="{{ v }}" {% if (item.priority if item else 2) == v %}selected{% endif %}>{{ l }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    {% if show_notes %}
+    <label class="wide">Notes <textarea name="notes" rows="2" placeholder="Color, size, who it's for…">{{ item.notes if item else '' }}</textarea></label>
+    {% endif %}
+  </div>
+{%- endmacro %}

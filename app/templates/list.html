@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% from "_macros.html" import signal_chip, target_chip, priority_pill, product_title, item_fields %}
+{% block title %}Shopping list · Price-Tracked Shopping List{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>Shopping list</h1>
+  <a class="btn btn-primary" href="{{ url_for('main.search_page') }}">+ Add item</a>
+</div>
+
+{% if view.rows %}
+<section class="summary" aria-label="List summary">
+  <div class="stat">
+    <div class="stat-label">Total at best prices</div>
+    <div class="stat-value">{{ view.total|money }}</div>
+    <div class="stat-sub">{{ view.units }} unit{{ 's' if view.units != 1 }}, shipping included{% if view.unpriced %} · {{ view.unpriced }} without a price{% endif %}</div>
+  </div>
+  <div class="stat">
+    <div class="stat-label">Below target</div>
+    <div class="stat-value">{{ view.below_target }}</div>
+    <div class="stat-sub">of {{ view.rows|length }} item{{ 's' if view.rows|length != 1 }}</div>
+  </div>
+</section>
+
+<ul class="items">
+  {% for r in view.rows %}
+  {% set item = r.item %}{% set p = r.product %}
+  <li class="item card{% if r.below_target %} is-below{% endif %}" id="item-{{ item.id }}">
+    <a class="thumb" href="{{ url_for('main.product_page', pid=p.id) }}" tabindex="-1" aria-hidden="true">
+      {% if p.image_url %}<img src="{{ p.image_url }}" alt="" loading="lazy">{% endif %}
+    </a>
+    <div class="item-main">
+      <h2 class="item-title">{{ product_title(p) }}</h2>
+      <div class="item-meta">
+        {% if item.quantity > 1 %}<span>Qty {{ item.quantity }}</span>{% endif %}
+        {{ priority_pill(item.priority) }}
+        {% if r.below_target %}{{ target_chip() }}{% endif %}
+        {{ signal_chip(r.signal) }}
+      </div>
+      {% if item.notes %}<p class="item-notes">{{ item.notes }}</p>{% endif %}
+    </div>
+    <div class="item-price">
+      {% if r.best %}
+        <div class="price-big">{{ r.best.total|money }}</div>
+        <div class="price-where">at {{ r.best.retailer_label }}{% if r.best.shipping %} · incl. {{ r.best.shipping|money }} shipping{% endif %}</div>
+      {% else %}
+        <div class="price-big muted">—</div>
+        <div class="price-where">No current price</div>
+      {% endif %}
+      <div class="price-target">{% if item.target_price is not none %}Target {{ item.target_price|money }}{% else %}No target set{% endif %}</div>
+    </div>
+    <div class="item-trend" aria-label="30-day best price trend">
+      {{ r.spark_svg|safe }}
+      <span class="trend-label">{% if r.trend_pct is not none %}{{ r.trend_pct|pct }} in 30 days{% else %}30-day trend{% endif %}</span>
+    </div>
+    <div class="item-actions">
+      <details class="disclose">
+        <summary class="btn btn-small">Edit</summary>
+        <form method="post" action="{{ url_for('main.list_update', iid=item.id) }}" class="stack">
+          <input type="hidden" name="csrf" value="{{ csrf_token }}">
+          {{ item_fields(item) }}
+          <div class="row-actions">
+            <button class="btn btn-primary btn-small">Save</button>
+            <button class="btn btn-small btn-ghost" formaction="{{ url_for('main.list_delete', iid=item.id) }}">Remove from list</button>
+          </div>
+        </form>
+      </details>
+      <details class="disclose">
+        <summary class="btn btn-small">Mark purchased</summary>
+        <form method="post" action="{{ url_for('main.list_purchase', iid=item.id) }}" class="stack">
+          <input type="hidden" name="csrf" value="{{ csrf_token }}">
+          <div class="fields">
+            <label>Paid per unit <span class="input-money"><input type="text" name="paid_price" inputmode="decimal" value="{{ '%.2f'|format(r.best.total) if r.best and r.best.total is not none else '' }}"></span></label>
+            <label>Where <input type="text" name="paid_retailer" value="{{ r.best.retailer_label if r.best else '' }}"></label>
+            <label>Date <input type="date" name="purchased_on" value="{{ today.isoformat() }}" max="{{ today.isoformat() }}"></label>
+          </div>
+          <button class="btn btn-primary btn-small">✓ Check off</button>
+        </form>
+      </details>
+      <a class="btn btn-small btn-ghost" href="{{ url_for('main.product_page', pid=p.id) }}">Compare prices</a>
+    </div>
+  </li>
+  {% endfor %}
+</ul>
+{% else %}
+<div class="empty card">
+  <h2>Your list is empty</h2>
+  <p>Search for a product by name, model number or UPC, or paste a product link.</p>
+  <a class="btn btn-primary" href="{{ url_for('main.search_page') }}">Search products</a>
+  {% if data_mode == 'mock' %}
+  <form method="post" action="{{ url_for('main.settings_load_demo') }}" class="inline">
+    <input type="hidden" name="csrf" value="{{ csrf_token }}"><button class="btn">Load the demo list</button>
+  </form>
+  {% endif %}
+</div>
+{% endif %}
+{% endblock %}

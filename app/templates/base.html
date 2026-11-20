@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light dark">
+  <title>{% block title %}Price-Tracked Shopping List{% endblock %}</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%232a78d6'/><path d='M8 21l5-6 4 3 7-9' stroke='white' stroke-width='3' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
+  {% block head %}{% endblock %}
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <a class="brand" href="{{ url_for('main.shopping_list') }}" aria-label="Price-Tracked Shopping List, home">
+        <svg viewBox="0 0 32 32" width="26" height="26" aria-hidden="true"><rect width="32" height="32" rx="7" fill="var(--series-1)"/><path d="M8 21l5-6 4 3 7-9" stroke="#fff" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span>Price-Tracked <span class="brand-sub">Shopping List</span></span>
+      </a>
+      <form class="topsearch" action="{{ url_for('main.search_page') }}" method="get" role="search">
+        <input type="search" name="q" placeholder="Search name, model, UPC or paste a link" aria-label="Search products" value="{{ q if q is defined else '' }}">
+      </form>
+      <nav class="nav" aria-label="Main">
+        {% set ep = request.endpoint %}
+        <a href="{{ url_for('main.shopping_list') }}" {% if ep == 'main.shopping_list' %}aria-current="page"{% endif %}>List</a>
+        <a href="{{ url_for('main.search_page') }}" {% if ep == 'main.search_page' %}aria-current="page"{% endif %}>Search</a>
+        <a href="{{ url_for('main.archive') }}" {% if ep == 'main.archive' %}aria-current="page"{% endif %}>Past buys</a>
+        <a href="{{ url_for('main.settings') }}" {% if ep == 'main.settings' %}aria-current="page"{% endif %}>Settings</a>
+      </nav>
+    </div>
+  </header>
+
+  {% if data_mode == 'mock' %}
+  <div class="demo-bar" role="note">
+    Demo mode: prices are simulated. Add API keys in <code>.env</code> to track real prices.
+    <a href="{{ url_for('main.settings') }}">Details</a>
+  </div>
+  {% endif %}
+
+  <main class="page">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+      <div class="flashes" role="status">
+        {% for cat, msg in messages %}<div class="flash flash-{{ cat }}">{{ msg }}</div>{% endfor %}
+      </div>
+      {% endif %}
+    {% endwith %}
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer class="footer">
+    <span>{% if last_run %}Last price snapshot {{ last_run.started_at|local_dt }}{% else %}No price snapshot has run yet{% endif %}</span>
+    {% if auth_enabled %}
+    <form method="post" action="{{ url_for('main.logout') }}" class="inline"><input type="hidden" name="csrf" value="{{ csrf_token }}"><button class="linkbtn">Sign out</button></form>
+    {% endif %}
+  </footer>
+  {% block scripts %}{% endblock %}
+</body>
+</html>
